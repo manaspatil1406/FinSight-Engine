@@ -26,6 +26,8 @@ SUMMARY_CSV = os.path.join(OUTPUTS_DIR, "sector_sentiment_summary.csv")
 TRENDS_CSV = os.path.join(OUTPUTS_DIR, "market_trends.csv")
 YEAR_TREND_CSV = os.path.join(OUTPUTS_DIR, "year_wise_sentiment.csv")
 HEADLINES_CSV = os.path.join(OUTPUTS_DIR, "top_headlines_per_sector.csv")
+LIVE_NEWS_RESULTS_CSV = os.path.join(OUTPUTS_DIR, "live_news_results.csv")
+LIVE_NEWS_CACHE_CSV = os.path.join(OUTPUTS_DIR, "live_news_cache.csv")
 
 # Chart Paths
 CHART_FILES = {

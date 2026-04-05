@@ -21,6 +21,15 @@ from financial_lexicon import adjust_sentiment, get_sentiment_label as fin_get_s
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# Live analysis imports
+try:
+    from live_analyzer import smart_fetch, get_live_market_summary, analyze_live_news
+except ImportError:
+    # If not in path, try adding src
+    sys.path.append(os.path.join(CHDIR, "src"))
+    from live_analyzer import smart_fetch, get_live_market_summary, analyze_live_news
+from datetime import datetime
+
 # ============================================================
 # PIPELINE RUNNER
 # ============================================================
@@ -186,6 +195,14 @@ st.set_page_config(
     layout="wide",
 )
 
+# Initialize Session State
+if 'live_df' not in st.session_state:
+    st.session_state.live_df = None
+if 'last_fetch_time' not in st.session_state:
+    st.session_state.last_fetch_time = None
+if 'fetch_count' not in st.session_state:
+    st.session_state.fetch_count = 0
+
 # ============================================================
 # CUSTOM CSS
 # ============================================================
@@ -261,7 +278,7 @@ with st.sidebar:
     st.markdown("## 📊 Navigation")
     page = st.radio(
         "Go to",
-        ["🏠 Home", "🔍 Live News Analyzer", "📊 Market Dashboard", "📈 Sector Trends"],
+        ["🏠 Home", "🔍 Live News Analyzer", "📊 Market Dashboard", "📈 Sector Trends", "🔴 Live Feed"],
         label_visibility="collapsed",
     )
     st.markdown("---")
@@ -550,6 +567,138 @@ elif page == "📈 Sector Trends":
 
     styled = trends_display.style.map(color_trend, subset=["Trend"])
     st.dataframe(styled, use_container_width=True)
+
+# ============================================================
+# PAGE 5 — LIVE FEED
+# ============================================================
+elif page == "🔴 Live Feed":
+    st.markdown("""
+    <div class="main-header">
+        <h1>🔴 Live Financial News Feed</h1>
+        <p>Real-time news processing from NewsAPI & Yahoo RSS</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Show last updated time
+    if st.session_state.last_fetch_time:
+        st.caption(f"🕐 Last updated: {st.session_state.last_fetch_time}")
+    else:
+        st.caption("🕐 Not fetched yet. Click 'Fetch Latest Now' below.")
+
+    # Sidebar parameters for auto-refresh
+    with st.sidebar:
+        st.markdown("---")
+        st.markdown("### 🔴 Live Settings")
+        auto_refresh = st.toggle("🔄 Auto Refresh (5 mins)", value=False)
+        if auto_refresh:
+            st.caption("Page will reload periodically.")
+
+    # Main action bar
+    col_btn, col_spacer = st.columns([1, 2])
+    with col_btn:
+        if st.button("🔄 Fetch Latest Now", use_container_width=True, type="primary"):
+            with st.spinner("🔍 Fetching fresh financial news..."):
+                # Force fresh fetch — bypass ALL cache
+                df_fresh = smart_fetch(force_refresh=True)
+                
+                # Update session state
+                st.session_state.live_df = df_fresh
+                st.session_state.last_fetch_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                st.session_state.fetch_count += 1
+                
+                if df_fresh is not None and not df_fresh.empty:
+                    st.success(f"✅ Fetched {len(df_fresh)} articles (including history)!")
+                else:
+                    st.warning("⚠️ No new articles found. Try again in a few minutes.")
+
+    # Load data if not already loaded (initial load)
+    if st.session_state.live_df is None:
+        with st.spinner("Loading cached news..."):
+            st.session_state.live_df = smart_fetch()
+
+    df_to_show = st.session_state.live_df
+
+    if df_to_show is not None and not df_to_show.empty:
+        # Visual metrics for proof of freshness
+        m_col1, m_col2, m_col3 = st.columns(3)
+        with m_col1:
+            st.metric("📰 Total Articles", len(df_to_show))
+        with m_col2:
+            st.metric("🔄 Fetch Session Count", st.session_state.fetch_count)
+        with m_col3:
+            if 'fetched_at' in df_to_show.columns:
+                latest_fetch = df_to_show['fetched_at'].max()
+                st.metric("🕐 Source Fetch Time", latest_fetch.split()[-1])
+        
+        if 'publishedAt' in df_to_show.columns:
+            newest_pub = df_to_show['publishedAt'].max()
+            st.caption(f"📅 Most recent article published: **{newest_pub}**")
+
+        st.markdown("---")
+
+        # Sector Navigation Tabs
+        sectors = ['IT', 'Banking', 'Pharma', 'Energy', 'Automobile']
+        tabs = st.tabs(['🖥️ IT', '🏦 Banking', '💊 Pharma', '⚡ Energy', '🚗 Auto'])
+        
+        for tab, sector in zip(tabs, sectors):
+            with tab:
+                # Filter and sort by newest first
+                sector_news = df_to_show[df_to_show['predicted_sector'] == sector]
+                if sector_news.empty:
+                    st.info(f"No recent news found for {sector}.")
+                else:
+                    sector_news = sector_news.sort_values('publishedAt', ascending=False)
+                    for _, row in sector_news.iterrows():
+                        sentiment = row['sentiment']
+                        score = row['vader_compound']
+                        
+                        # Use card highlighting from Fix 4
+                        if sentiment == 'Positive':
+                            color = "#e8f5e9" # light green
+                            border = "#4CAF50"
+                            tag = "🟢 Positive"
+                        elif sentiment == 'Negative':
+                            color = "#ffebee" # light red
+                            border = "#F44336"
+                            tag = "🔴 Negative"
+                        else:
+                            color = "#f5f5f5" # light gray
+                            border = "#9e9e9e"
+                            tag = "⚪ Neutral"
+                        
+                        st.markdown(f"""
+                        <div style="background:{color}; border-left:8px solid {border}; padding:1.2rem; border-radius:8px; margin-bottom:1rem; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+                            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.5rem;">
+                                <span style="font-weight:bold;">{tag} | Score: {score:+.2f}</span>
+                                <span style="font-size:0.8rem; color:#666;">{row['source']} | {row['publishedAt']}</span>
+                            </div>
+                            <h4 style="margin:0.2rem 0; color:#1a1a2e; font-size:1.1rem;">{row['title']}</h4>
+                            <p style="margin:0.5rem 0; font-size:0.9rem; color:#444; line-height:1.4;">{row.get('description', '')[:250]}{'...' if len(str(row.get('description', ''))) > 250 else ''}</p>
+                            <div style="margin-top:0.8rem;">
+                                <a href="{row['url']}" target="_blank" style="text-decoration:none; color:#1565c0; font-size:0.85rem; font-weight:600;">🔗 Read Full Article →</a>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+        # Market Summary Comparison
+        st.markdown("---")
+        st.markdown("### 📊 Live Sentiment Summary by Sector")
+        summary_df, _, _ = get_live_market_summary(df_to_show)
+        
+        st.dataframe(summary_df.set_index('Sector').style.format({
+            'Positive': '{:.1f}%',
+            'Negative': '{:.1f}%',
+            'Neutral': '{:.1f}%'
+        }), use_container_width=True)
+
+    else:
+        st.warning("No live news data available. Click 'Fetch Latest Now' to start.")
+
+    # Auto refresh logic
+    if auto_refresh:
+        import time
+        time.sleep(300) # Wait 5 minutes
+        st.rerun()
 
 # ============================================================
 # To run: streamlit run app.py
