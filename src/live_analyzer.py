@@ -49,6 +49,10 @@ def analyze_live_news():
     if os.path.exists(LIVE_NEWS_RESULTS_CSV):
         try:
             previous_df = pd.read_csv(LIVE_NEWS_RESULTS_CSV)
+            if 'fetched_at' not in previous_df.columns:
+                previous_df['fetched_at'] = previous_df.get('analyzed_at')
+            else:
+                previous_df['fetched_at'] = previous_df['fetched_at'].fillna(previous_df.get('analyzed_at'))
         except Exception as e:
             print(f"Error loading previous results: {e}")
 

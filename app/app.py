@@ -627,8 +627,10 @@ elif page == "🔴 Live Feed":
             st.metric("🔄 Fetch Session Count", st.session_state.fetch_count)
         with m_col3:
             if 'fetched_at' in df_to_show.columns:
-                latest_fetch = df_to_show['fetched_at'].max()
-                st.metric("🕐 Source Fetch Time", latest_fetch.split()[-1])
+                fetched_times = pd.to_datetime(df_to_show['fetched_at'], errors='coerce')
+                latest_fetch = fetched_times.max()
+                if pd.notna(latest_fetch):
+                    st.metric("🕐 Source Fetch Time", latest_fetch.strftime('%H:%M:%S'))
         
         if 'publishedAt' in df_to_show.columns:
             newest_pub = df_to_show['publishedAt'].max()

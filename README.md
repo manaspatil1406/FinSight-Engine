@@ -150,6 +150,3 @@ streamlit run app.py
 ## ℹ️ About the Project
 
 Developed as a comprehensive solution for financial market surveillance, this tool helps investors and analysts quickly grasp market sentiment and trends across various sectors using data-driven insights.
-
-**Author:** Rajesh Patil  
-**Version:** 1.0.0
