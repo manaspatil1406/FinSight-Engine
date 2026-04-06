@@ -1,0 +1,24 @@
+streamlit
+pandas
+joblib
+vaderSentiment
+pillow
+newsapi-python
+feedparser
+requests
+nltk
+spacy
+matplotlib
+seaborn
+scikit-learn
+numpy
+
+# Optional (only if you plan to use transformer-based FinBERT):
+# transformers
+# torch
+
+# Post-install notes:
+# - Download NLTK data used by the project:
+#     python -m nltk.downloader stopwords
+# - Install the spaCy English model:
+#     python -m spacy download en_core_web_sm
